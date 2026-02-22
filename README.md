@@ -15,11 +15,13 @@ This document is dedicated to the **Atlassian Agent** method, which is considere
 
 - [Prerequisites](#prerequisites)
 - [Step 1: Installing Jira on Ubuntu](#step-1-installing-jira-on-ubuntu)
-- [Step 2: Preparing the Agent File](#step-2-preparing-the-agent-file)
-- [Step 3: Injecting Agent into Jira JVM](#step-3-injecting-agent-into-jira-jvm)
-- [Step 4: Cleanup and Restart](#step-4-cleanup-and-restart)
-- [Step 5: Verify Agent Loading](#step-5-verify-agent-loading)
-- [Step 6: Generating License Code](#step-6-generating-license-code)
+- [Step 2: Download Required Files](#step-2-download-required-files)
+- [Step 3: Preparing the Agent File](#step-3-preparing-the-agent-file)
+- [Step 4: Running the Python Patch Script](#step-4-running-the-python-patch-script)
+- [Step 5: Injecting Agent into Jira JVM](#step-5-injecting-agent-into-jira-jvm)
+- [Step 6: Cleanup and Restart](#step-6-cleanup-and-restart)
+- [Step 7: Verify Agent Loading](#step-7-verify-agent-loading)
+- [Step 8: Generating License Code](#step-8-generating-license-code)
 - [Key Points for Future](#key-points-for-future)
 - [Troubleshooting Common Issues](#troubleshooting-common-issues)
 
@@ -48,6 +50,9 @@ sudo apt install -y wget curl net-tools
 
 # Check Java version
 java -version
+
+# Check Python version
+python3 --version
 ```
 
 ---
@@ -81,6 +86,8 @@ sudo chown -R jira:jira /opt/atlassian/jira
 sudo mkdir -p /opt/atlassian/jira-home
 sudo chown -R jira:jira /opt/atlassian/jira-home
 ```
+
+> **⚠️ IMPORTANT NOTE**: Make sure Jira is installed in the `/opt/atlassian/jira` path. If your installation is in a different directory (e.g., in `/home/gulfgate/...`), you will need to edit the paths in the following steps accordingly.
 
 ### 1.2 Configure Port and Database
 
@@ -129,32 +136,44 @@ Now open your browser and navigate to `http://your-server-ip:8080`. Follow the i
 
 ---
 
-## Step 2: Preparing the Agent File
-
-### 2.1 Download the Agent File
+## Step 2: Download Required Files
 
 <div dir="ltr">
 
-First, download the `atlassian-agent.jar` file:
+Download both the agent file and the Python patch script:
 
 </div>
 
 ```bash
 # Create agent directory
 sudo mkdir -p /opt/atlassian/jira/agent
-
-# Download agent (if direct access available)
-# Otherwise upload the file from your source
 cd /tmp
+
+# Download the atlassian-agent.jar file
+# (Replace the URL with your actual download link)
 wget https://example.com/path/to/atlassian-agent.jar
 
-# Copy file to installation directory
-sudo cp atlassian-agent.jar /opt/atlassian/jira/agent/
+# Download the Python patch script
+wget https://example.com/path/to/atlassian_patch.py
+
+# Make the Python script executable
+chmod +x atlassian_patch.py
 ```
 
-### 2.2 Set Ownership and Permissions
+---
+
+## Step 3: Preparing the Agent File
+
+<div dir="ltr">
+
+Set up the agent file with proper permissions:
+
+</div>
 
 ```bash
+# Copy agent file to installation directory
+sudo cp atlassian-agent.jar /opt/atlassian/jira/agent/
+
 # Set ownership (very important)
 sudo chown -R jira:jira /opt/atlassian/jira/agent/
 sudo chmod 644 /opt/atlassian/jira/agent/atlassian-agent.jar
@@ -165,7 +184,54 @@ ls -la /opt/atlassian/jira/agent/
 
 ---
 
-## Step 3: Injecting Agent into Jira JVM
+## Step 4: Running the Python Patch Script
+
+<div dir="ltr">
+
+The Python patch script (`atlassian_patch.py`) is designed to verify and fix any permission or configuration issues. This script only uses standard Python libraries, so no additional packages are needed.
+
+</div>
+
+```bash
+# First, ensure your Jira path is correct
+# If Jira is installed in a custom location, edit the script or specify the path
+
+# Run the Python patch script
+sudo python3 atlassian_patch.py
+```
+
+<div dir="ltr">
+
+### What the Python Script Does:
+
+- Checks if Jira is installed in the expected location
+- Verifies file permissions
+- Tests if the agent can be loaded
+- Identifies any access issues
+- Provides recommendations for fixes
+
+### About the "Unknown" Version Issue:
+
+If you see "Unknown" when checking the Jira version, it means Jira does not allow the current user to access its internal files. This is a permission issue that can be resolved by:
+
+1. **Running commands with `sudo`** - This gives you the necessary privileges
+2. **Checking ownership** - Ensure all Jira files are owned by the `jira` user
+3. **Verifying file permissions** - Make sure files have the correct read/write permissions
+
+</div>
+
+```bash
+# If you encounter "Unknown" version issues, try:
+sudo -u jira python3 atlassian_patch.py
+
+# Or fix permissions manually:
+sudo chown -R jira:jira /opt/atlassian/jira
+sudo chmod -R 755 /opt/atlassian/jira
+```
+
+---
+
+## Step 5: Injecting Agent into Jira JVM
 
 <div dir="ltr">
 
@@ -208,7 +274,7 @@ JAVA_OPTS="$JAVA_OPTS -javaagent:/opt/atlassian/jira/agent/atlassian-agent.jar"
 
 ---
 
-## Step 4: Cleanup and Restart
+## Step 6: Cleanup and Restart
 
 <div dir="ltr">
 
@@ -239,7 +305,7 @@ sudo tail -f /opt/atlassian/jira-home/log/catalina.out
 
 ---
 
-## Step 5: Verify Agent Loading
+## Step 7: Verify Agent Loading
 
 <div dir="ltr">
 
@@ -256,6 +322,9 @@ sudo grep -i "agent" /opt/atlassian/jira-home/log/catalina.out
 
 # Or check Jira logs
 sudo grep -i "atlassian-agent" /opt/atlassian/jira-home/log/atlassian-jira.log
+
+# Run the Python patch script again to verify
+sudo python3 atlassian_patch.py --verify
 ```
 
 <div dir="ltr">
@@ -266,7 +335,7 @@ sudo grep -i "atlassian-agent" /opt/atlassian/jira-home/log/atlassian-jira.log
 
 ---
 
-## Step 6: Generating License Code
+## Step 8: Generating License Code
 
 <div dir="ltr">
 
@@ -329,7 +398,11 @@ java -jar /opt/atlassian/jira/agent/atlassian-agent.jar \
 
 ### 1. Jira Updates
 
-If you update Jira, remember to perform Step 3 again (edit setenv.sh), as this file gets overwritten during updates.
+If you update Jira, remember to perform Step 5 again (edit setenv.sh), as this file gets overwritten during updates. Also re-run the Python patch script to verify everything is working:
+
+```bash
+sudo python3 atlassian_patch.py --after-update
+```
 
 ### 2. .bat Files
 
@@ -339,7 +412,14 @@ Never go near `.bat` files in Linux; they are decorative and only work on Window
 
 Always remember that Jira cannot run simultaneously on both Docker and Ubuntu (Native) on the same port.
 
-### 4. Regular Backups
+### 4. Custom Installation Paths
+
+If you installed Jira in a custom location (e.g., `/home/gulfgate/jira`), remember to:
+- Update all paths in the agent configuration
+- Modify the Python patch script or use the `--path` parameter
+- Adjust the service files accordingly
+
+### 5. Regular Backups
 
 </div>
 
@@ -348,11 +428,14 @@ Always remember that Jira cannot run simultaneously on both Docker and Ubuntu (N
 sudo cp /opt/atlassian/jira/bin/setenv.sh /opt/atlassian/jira/bin/setenv.sh.backup
 sudo cp /opt/atlassian/jira/bin/catalina.sh /opt/atlassian/jira/bin/catalina.sh.backup
 
+# Backup the Python patch script
+sudo cp atlassian_patch.py /opt/atlassian/jira/agent/
+
 # Backup entire configuration
 sudo tar -czf /tmp/jira-backup-$(date +%Y%m%d).tar.gz /opt/atlassian/jira /opt/atlassian/jira-home
 ```
 
-### 5. Create systemd Service (for auto-start)
+### 6. Create systemd Service (for auto-start)
 
 ```bash
 sudo nano /etc/systemd/system/jira.service
@@ -405,6 +488,13 @@ If it still shows "Unknown" version, it means Jira doesn't allow the current use
 ```bash
 # Check permissions
 sudo -u jira ls -la /opt/atlassian/jira/agent/
+
+# Run the Python patch script with sudo
+sudo python3 atlassian_patch.py --fix-permissions
+
+# Manual permission fix
+sudo chown -R jira:jira /opt/atlassian/jira
+sudo chmod -R 755 /opt/atlassian/jira
 ```
 
 ### Issue 2: Agent Not Loading
@@ -415,6 +505,9 @@ sudo cat /opt/atlassian/jira-home/log/catalina.out | grep -i "javaagent"
 
 # Check environment variables
 sudo -u jira cat /opt/atlassian/jira/bin/setenv.sh | grep -i "javaagent"
+
+# Run Python diagnostic
+sudo python3 atlassian_patch.py --diagnose
 ```
 
 ### Issue 3: Port Already in Use
@@ -437,6 +530,22 @@ sudo kill -9 [PID]
 sudo chown -R jira:jira /opt/atlassian/jira
 sudo chown -R jira:jira /opt/atlassian/jira-home
 sudo chmod -R 755 /opt/atlassian/jira
+
+# Run the Python patch script to verify
+sudo python3 atlassian_patch.py --check-permissions
+```
+
+### Issue 5: Custom Installation Path
+
+```bash
+# If Jira is installed in a custom location, update the Python script
+# or use environment variables
+export JIRA_HOME="/custom/path/to/jira"
+sudo python3 atlassian_patch.py --jira-path="$JIRA_HOME"
+
+# Update agent path in setenv.sh accordingly
+# Change: /opt/atlassian/jira/agent/atlassian-agent.jar
+# To: /custom/path/to/jira/agent/atlassian-agent.jar
 ```
 
 ---
@@ -451,7 +560,24 @@ sudo chmod -R 755 /opt/atlassian/jira
 | Stop Jira | `sudo -u jira /opt/atlassian/jira/bin/stop-jira.sh` |
 | Check Logs | `sudo tail -f /opt/atlassian/jira-home/log/catalina.out` |
 | Verify Agent | `ps aux \| grep javaagent` |
+| Run Python Patch | `sudo python3 atlassian_patch.py` |
+| Fix Permissions | `sudo python3 atlassian_patch.py --fix-permissions` |
 | Generate License | `java -jar /opt/atlassian/jira/agent/atlassian-agent.jar -d -m email -n company -p jsm -o url -s server-id` |
+
+</div>
+
+---
+
+## 📥 Download Links
+
+<div dir="ltr">
+
+| File | Description | Download Link |
+|------|-------------|---------------|
+| `atlassian-agent.jar` | Main agent file for license bypass | [Download](#) |
+| `atlassian_patch.py` | Python patch script for verification and fixes | [Download](#) |
+
+> **Note**: Replace the download links above with your actual file hosting locations.
 
 </div>
 
@@ -459,6 +585,6 @@ sudo chmod -R 755 /opt/atlassian/jira
 
 <div dir="ltr">
 
-**✅ Congratulations!** Your Jira is now activated with a valid license and ready to use.
+**✅ Congratulations!** Your Jira is now activated with a valid license and ready to use. The Python patch script has verified that everything is configured correctly.
 
 </div>
